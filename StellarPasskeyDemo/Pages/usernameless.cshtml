@@ -5,19 +5,44 @@
 
 <div class="section">
     <div class="container">
-        <h1 class="title is-1">Scenario: Usernameless</h1>
+        <h2 class="title is-1">Usernameless and Passwordless Registration and Signin</h2>
         <div class="content">
-            <p>In this scenario we have removed the need for both usernames and passwords. The WebAuthn flow is very similiar to the paswordless flow, but when registering we require the resident key option. User account selection is handled by the client/authenticator. If multiple credentials are found, the user will be able to choose which credential to use.</p>
-            <p>Note: When we say passwordless, what we mean is that no password is sent over the internet or stored in a database. Password, PINs or Biometrics might be used by the authenticator on the client</p>
+            <p>This is a WebAuthN flow that stores credentials without the need for a username or password on the server. </p>
+            <p>The user is prompted to sign up using an Authenticator. If the operating system supports ECDSA secp256r1, the OS may be the authenticator,
+               otherwise a mobile phone or security key can be used as a roaming authenticator.
+            </p>
+            <p>
+                When you press "Register User" you will be prompted to create a passkey for this server. This passkey is personal to you. Because
+                there is no password to remember and no username to ask for, there is little or no opportunity for phishing attacks. Further, there
+                is no password to steal from the server, and no personally identifying information need even be provided, if so desired. For this reason,
+                passkeys are now mandatory for some scenarios, such as internal healthcare and finance application login, and growing as a consumer
+                login choice for the public web.
+            </p>
+            <p>
+                While registering the user and creating a passkey, a public key is created according to the WebAuthN protocol, which is used to register
+                a fresh "smart" account on the Stellar network. A Stellar account is a way of offloading your authentication, authorisation and account
+                management onto highly secure external infrastructure, as an alternative to say Cloud auth providers, that has in-built account transaction
+                processing functionality.
+            </p>
+            <p>
+                When you press "Sign In", your passkey is used to sign a server generated challenge, and that is passed to the Stellar smart account.
+                That in turn authenticates and authorises on the basis of your signin, to, in this simple use case, update a global sign in logbook.
+                It illustrates how with a simple process of signing up and signing in, and with your own custom logic for your Stellar smart account, you can
+                securely implement almost any account related functionality, share it across apps within your organisation, or even with business partners, and offload 
+                it onto extremely robust, reliable and secure external infrastructure.
+            </p>
+
+            <p>
+                <b>A full explanation of the source is in the DEV.TO link in the header.</b>
+            </p>
+            
         </div>
 
         <div class="notification is-danger" style="display:none">
             Please note: Your browser does not seem to support WebAuthn yet. <a href="https://caniuse.com/#search=webauthn" target="_blank">Supported browsers</a>
         </div>
 
-        <div class="notification is-warning">
-            Please note: At the time of writing (July 2019) this is not supported on all browsers. Confirmed to work on: Windows Edge, Edge (OS X, pre-release), Firefox 69 (Windows), Chrome 76.0.3809.72 beta (OS X)
-        </div>
+
         <div class="columns">
             <div class="column is-4">
 
@@ -81,23 +106,6 @@
 </div>
 
 
-<div class="section">
-    <div class="container">
-        <div class="content">
-            <h1 class="title is-2">Explanation: Username and paswordless login with FIDO2</h1>
-            <p>
-                In this scenario, WebAuthn is used without a username to securely authenticate the user. This requires the Authenticator to support Resident Keys.
-                The flow is visualized in the figure below.
-            </p>
-            <img src="~/images/scenario3.png" alt="figure visualizing username and challenge sent together with assertion" />
-            <p>In this flow the Relying Party should tell the Authenticator to do User Verification (set UserVerification to required) via Biometrics/pin, thus the authentication is MFA (Something the user has - the private key - and something the user knows/is - the PIN or biometrics). However in scenarios where security requirements are very low we we could discourage user verification to minimize the user interaction needed to sign in. If discouraged, only user presence will be checked (Any human is present at the device).</p>
-
-            <p>
-                Read the source code for this demo here: <a href="@Url.ToGithub("Demo/wwwroot/js/usernameless.register.js")">usernameless.register.js</a> and <a href="@Url.ToGithub("Demo/wwwroot/js/usernameless.login.js")">usernameless.login.js</a>
-            </p>
-        </div>
-    </div>
-</div>
 
 <script src="~/js/usernameless.register.js"></script>
 <script src="~/js/usernameless.login.js"></script>
