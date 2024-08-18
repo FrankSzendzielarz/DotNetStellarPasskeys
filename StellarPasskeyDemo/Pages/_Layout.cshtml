@@ -6,7 +6,7 @@
 <html lang="en">
 
 <head>
-    <title>FIDO2 &amp; Webauthn for .NET</title>
+    <title>Passkey Auth for .NET using Stellar</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
@@ -58,14 +58,12 @@
                             <a class="navbar-item" asp-page="/overview">
                                 Home
                             </a>
-                            <a class="navbar-item" href="https://github.com/passwordless-lib/fido2-net-lib#examples">
-                                Documentation
+                            <a class="navbar-item" href="article">
+                                DEV.TO
                             </a>
-                            <a class="navbar-item" href="https://opencollective.com/passwordless">
-                                Become a backer
-                            </a>                            
+                                         
                             <span class="navbar-item">
-                                <a class="button is-info is-inverted" href="https://github.com/passwordless-lib/fido2-net-lib">
+                                <a class="button is-info is-inverted" href="https://github.com/FrankSzendzielarz/DotNetStellarPasskeys">
                                     <span class="icon">
                                         <i class="fab fa-github"></i>
                                     </span>
@@ -81,10 +79,10 @@
         <div class="hero-body">
             <div class="container has-text-centered">
                 <p class="title">
-                    Passwordless - FIDO2 for .NET
+                    Passkey Auth for .NET using Stellar 
                 </p>
                 <p class="subtitle">
-                    Enabling smoooth sign in using FIDO2 / WebAuthn
+                    Smooth sign in using Passkeys, with integrated robust, secure, and fast account handling using Stellar.
                 </p>
             </div>
         </div>
@@ -96,18 +94,10 @@
                         <li class="@isActive("/overview")">
                             <a asp-page="/overview" asp-fragment="heroFoot">Overview</a>
                         </li>
-                        <li class="@isActive("/mfa")">
-                            <a asp-page="/mfa" asp-fragment="heroFoot">Use as 2FA/MFA</a>
-                        </li>
-                        <li class="@isActive("/passwordless")">
-                            <a asp-page="/passwordless" asp-fragment="heroFoot">Go Passwordless</a>
-                        </li>
                         <li class="@isActive("/usernameless")">
-                            <a asp-page="/usernameless" asp-fragment="heroFoot">Go Usernameless too</a>
+                            <a asp-page="/usernameless" asp-fragment="heroFoot">Interactive Passkey Demo</a>
                         </li>
-                        <li class="@isActive("/custom")">
-                            <a asp-page="/custom" asp-fragment="heroFoot">Custom</a>
-                        </li>
+                      
                     </ul>
                 </div>
             </nav>
@@ -117,13 +107,13 @@
     <footer class="footer" style="        margin-top: 20vh">
         <div class="content has-text-centered">
             <p>
-                <strong>Fido2 .NET library</strong> by <a href="https://github.com/abergs">Anders Åberg</a>, <a href="https://github.com/aseigler">Alex Seigler</a> and <a href="https://github.com/passwordless-lib/fido2-net-lib/graphs/contributors">contributors</a>. The source code is licensed
-                <a href="http://opensource.org/licenses/mit-license.php">MIT</a>. Available on <a href="https://github.com/passwordless-lib/fido2-net-lib">Github</a>
+                <strong>Passwordless Passkeys with public accounts based on Stellar. The source code is licensed
+                    <a href="http://opensource.org/licenses/mit-license.php">MIT</a>. Available on <a href="https://github.com/FrankSzendzielarz/DotNetStellarPasskeys">Github</a>
             </p>
 
-            <p><small>Supported by the <a href="https://dotnetfoundation.org">.NET Foundation</a></small></p>
-            <img src="~/images/dotnetfoundation_v4_horizontal.svg" alt=".NET foundation logo" width="220" />
             
+            <p><small>With huge thanks Smart Contracts from <a href="https://github.com/kalepail/soroban-passkey/">Tyler van der Hoeven</a></small></p>
+            <p><small>Fido2 .NET Lib from the .NET Foundation <a href="https://github.com/passwordless-lib/fido2-net-lib">FIDO2</a></small></p>
             <p><small>Illustrations from <a href="https://medium.com/@@herrjemand/introduction-to-webauthn-api-5fd1fb46c285">Ackermann Yuriy</a></small></p>
         </div>
     </footer>
