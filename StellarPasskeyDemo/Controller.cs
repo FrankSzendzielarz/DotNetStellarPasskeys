@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,6 +20,7 @@ using StellarDotnetSdk.Operations;
 using StellarDotnetSdk.Soroban;
 using StellarDotnetSdk.Transactions;
 using StellarDotnetSdk.Xdr;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 using static StellarDotnetSdk.Xdr.ContractIDPreimage;
 using static StellarDotnetSdk.Xdr.HashIDPreimage;
 
@@ -381,34 +383,123 @@ public class MyController : Controller
     {
         try
         {
-            // 1. Get the assertion options we sent the client
-            var jsonOptions = HttpContext.Session.GetString("fido2.assertionOptions");
-            var options = AssertionOptions.FromJson(jsonOptions);
+            //// 1. Get the assertion options we sent the client
+            //var jsonOptions = HttpContext.Session.GetString("fido2.assertionOptions");
+            //var options = AssertionOptions.FromJson(jsonOptions);
 
-            // 2. Get registered credential from database
-            var creds = DemoStorage.GetCredentialById(clientResponse.Id) ?? throw new Exception("Unknown credentials");
+            //// 2. Get registered credential from database
+            //var creds = DemoStorage.GetCredentialById(clientResponse.Id) ?? throw new Exception("Unknown credentials");
 
-            // 3. Get credential counter from database
-            var storedCounter = creds.SignCount;
+            /*
+             * Repeating code from Deploy Contract for clarity. Code is expanded for clarity and could be written more concisely.
+             * 
+             * Here we ask Stellar for the Smart Account given the credential id, which is supplied by the user's Authenticator device.
+             */
 
-            // 4. Create callback to check if the user handle owns the credentialId
-            IsUserHandleOwnerOfCredentialIdAsync callback = static async (args, cancellationToken) =>
+
+            byte[] credentialId= clientResponse.Id;
+
+            string sorobanNetwork = Environment.GetEnvironmentVariable("SOROBAN_NETWORK");
+            string sorobanNetworkPassphrase = Environment.GetEnvironmentVariable("SOROBAN_NETWORK_PASSPHRASE");
+            string sorobanRpcServer = Environment.GetEnvironmentVariable("SOROBAN_RPC_URL");
+            string ownerAccountPrivateKey = Environment.GetEnvironmentVariable("SOROBAN_ACCOUNT");
+            string factoryContractId = Environment.GetEnvironmentVariable("factoryContractId"); //TODO remove factoryContractId it's a dup
+            string horizonUrl = Environment.GetEnvironmentVariable("HORIZON_URL");
+
+            //Network Id in XDR is represented as a hash.
+            byte[] networkId = Util.Hash(Encoding.UTF8.GetBytes(sorobanNetworkPassphrase));
+            byte[] credentialIdContractSalt = Util.Hash(credentialId);
+
+            #region Get the ID of the passkey's smart account, irrespective of whether it exists or not
+            //A contract id preimage (prior to hashing) based on the smart contract address
+            var contractIDPreimageFromAddress = new ContractIDPreimageFromAddress()
             {
-                var storedCreds = await DemoStorage.GetCredentialsByUserHandleAsync(args.UserHandle, cancellationToken);
-                return storedCreds.Exists(c => c.Descriptor.Id.SequenceEqual(args.CredentialId));
+                Address = new StellarDotnetSdk.Xdr.SCAddress()
+                {
+                    ContractId = new Hash(StrKey.DecodeContractId(factoryContractId)),
+                    Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
+                },
+                Salt = new Uint256(credentialIdContractSalt)
             };
 
-            // 5. Make the assertion
-            var res = await _fido2.MakeAssertionAsync(clientResponse, options, creds.PublicKey, creds.DevicePublicKeys, storedCounter, callback, cancellationToken: cancellationToken);
+            // Create the HashIdPreimageContractId, which is just a union of the network id hash and the contract id preimage (iotw unhashed),
+            // making a unique contract id. The naming is a bit opaque at first, more intuitive being something like 'network contract id'
+            HashIDPreimageContractID contractIdPreimage = new HashIDPreimageContractID()
+            {
+                NetworkID = new Hash(networkId), //The XDR Hash object merely represents a hash, this ctor setting its inner value to the actual hash
+                ContractIDPreimage = new StellarDotnetSdk.Xdr.ContractIDPreimage()
+                {
+                    FromAddress = contractIDPreimageFromAddress,
+                    Discriminant = new ContractIDPreimageType() { InnerValue = ContractIDPreimageType.ContractIDPreimageTypeEnum.CONTRACT_ID_PREIMAGE_FROM_ADDRESS }
+                }
+            };
 
-            // 6. Store the updated counter
-            DemoStorage.UpdateCounter(res.CredentialId, res.SignCount);
+            // Make a general "Hash Id Preimage" object
+            var hashIdPreImage = new HashIDPreimage();
+            hashIdPreImage.Discriminant = new EnvelopeType() { InnerValue = EnvelopeType.EnvelopeTypeEnum.ENVELOPE_TYPE_CONTRACT_ID };
+            hashIdPreImage.ContractID = contractIdPreimage;
 
-            if (res.DevicePublicKey is not null)
-                creds.DevicePublicKeys.Add(res.DevicePublicKey);
+
+            // Now the XDR representation is expected hashed and this gives the contract id
+            XdrDataOutputStream xdrDataOutputStream = new XdrDataOutputStream();
+            HashIDPreimage.Encode(xdrDataOutputStream, hashIdPreImage);
+            var hashId = Util.Hash(xdrDataOutputStream.ToArray());
+
+            //// The hash now needs to be used as a specific type of "String Key" (StrKey). The following function encodes the hashed data correctly, involving contract id type discriminators and checksums, in a human readable format.
+            var contractId = StrKey.EncodeContractId(hashId);
+
+            #endregion
+
+
+            #region Ask the RPC Server for data on that Smart Account
+            Network network = new Network(sorobanNetworkPassphrase);
+            Network.Use(network);
+
+            SorobanServer server = new SorobanServer(sorobanRpcServer);
+
+            List<StellarDotnetSdk.LedgerKeys.LedgerKey> ledgerKeys = new List<StellarDotnetSdk.LedgerKeys.LedgerKey>();
+            SCContractId scContractId = new SCContractId(contractId);   // Make the contract id string a concrete type
+            var key = new SCLedgerKeyContractInstance();                // Specifies to search for a contract instance
+            var durability = new ContractDataDurability() { InnerValue = ContractDataDurability.ContractDataDurabilityEnum.PERSISTENT };
+            StellarDotnetSdk.LedgerKeys.LedgerKey ledgerKey = StellarDotnetSdk.LedgerKeys.LedgerKey.ContractData(scContractId, key, durability);
+            ledgerKeys.Add(ledgerKey);   //add the search key to a collection  
+
+            var res = await server.GetLedgerEntries(ledgerKeys.ToArray());
+            if (res.LedgerEntries.Length == 0)
+            {
+                return Json(new { status = "error", errorMessage = "Smart Account does not exist." });
+            }
+
+            #endregion
+
+
+            //make a transaction to the custom Sign In Log smart contract on Stellar, using the user's Smart Account as authoriser
+
+            //if all went well, continue in the knowledge that the user is authenticated and the
+
+
+
+            //// 3. Get credential counter from database
+            //var storedCounter = creds.SignCount;
+
+            //// 4. Create callback to check if the user handle owns the credentialId
+            //IsUserHandleOwnerOfCredentialIdAsync callback = static async (args, cancellationToken) =>
+            //{
+            //    var storedCreds = await DemoStorage.GetCredentialsByUserHandleAsync(args.UserHandle, cancellationToken);
+            //    return storedCreds.Exists(c => c.Descriptor.Id.SequenceEqual(args.CredentialId));
+            //};
+
+            //// 5. Make the assertion
+            //var res = await _fido2.MakeAssertionAsync(clientResponse, options, creds.PublicKey, creds.DevicePublicKeys, storedCounter, callback, cancellationToken: cancellationToken);
+
+            //// 6. Store the updated counter
+            //DemoStorage.UpdateCounter(res.CredentialId, res.SignCount);
+
+            //if (res.DevicePublicKey is not null)
+            //    creds.DevicePublicKeys.Add(res.DevicePublicKey);
 
             // 7. return OK to client
-            return Json(res);
+            return Json("ok");
         }
         catch (Exception e)
         {
