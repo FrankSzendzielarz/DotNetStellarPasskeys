@@ -49,8 +49,8 @@
   </Target>
 
   <Target Name="DeployContracts" Condition="'$(Configuration)' == 'DeployContracts'" BeforeTargets="Build">
-    <Exec Command="cd Contracts/out &amp;&amp; soroban contract deploy --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_factory.optimized.wasm" />
-    <Exec Command="cd Contracts/out &amp;&amp; soroban contract install --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_account_secp256r1.optimized.wasm" />
+	<Exec Command="cd Contracts/out &amp;&amp; soroban contract deploy --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_factory.optimized.wasm" />
+	<Exec Command="cd Contracts/out &amp;&amp; soroban contract install --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_account_secp256r1.optimized.wasm" />
     <Exec Command="cd Contracts/out &amp;&amp; soroban contract deploy --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./signin_record.optimized.wasm" />
   </Target>
 

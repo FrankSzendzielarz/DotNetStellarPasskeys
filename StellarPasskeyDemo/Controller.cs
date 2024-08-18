@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Formats.Asn1;
 using System.Linq;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -23,6 +25,7 @@ using StellarDotnetSdk.Xdr;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using static StellarDotnetSdk.Xdr.ContractIDPreimage;
 using static StellarDotnetSdk.Xdr.HashIDPreimage;
+
 
 namespace Fido2Demo;
 
@@ -299,23 +302,7 @@ public class MyController : Controller
             var horizonResponse=await horizon.SubmitTransaction(simTxn);
             
 
-    //        const txResp = await (await fetch(`${ PUBLIC_horizonUrl}/ transactions`, {
-    //        method:
-    //            'POST',
-    //    headers:
-    //            { 'Content-Type': 'application/x-www-form-urlencoded' },
-    //    body:
-    //            new URLSearchParams({ 'tx': transaction.toXDR() }),
-    //})).json();
-
-    //        if (txResp.successful)
-    //        {
-    //            return deployee
-    //        }
-    //        else
-    //        {
-    //            throw txResp
-    //}
+   
 
 
             #endregion
@@ -377,24 +364,79 @@ public class MyController : Controller
         }
     }
 
+
+
+
+
+    private static byte[] NormalizeS(byte[] s)
+    {
+        BigInteger CurveOrder = BigInteger.Parse("0FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", System.Globalization.NumberStyles.HexNumber);
+        var sValue = new BigInteger(s, isUnsigned: true, isBigEndian: true);
+        var halfOrder = (CurveOrder - BigInteger.One) / 2;
+
+        if (sValue > halfOrder)
+        {
+            sValue = CurveOrder - sValue;
+        }
+
+        var normalizedS = sValue.ToByteArray(isUnsigned: true, isBigEndian: true);
+        return Ensure32Bytes(normalizedS);
+    }
+
+    private static byte[] ConvertAsn1To64ByteSignature(byte[] asn1Signature)
+    {
+
+        // Decode the ASN.1 encoded signature
+        var reader = new AsnReader(asn1Signature, AsnEncodingRules.DER);
+        var sequence = reader.ReadSequence();
+        var r = sequence.ReadIntegerBytes().ToArray();
+        var s = sequence.ReadIntegerBytes().ToArray();
+
+        // Ensure r and s are 32 bytes each
+        r = Ensure32Bytes(r);
+        s = Ensure32Bytes(s);
+
+        // Normalize s to low form
+        s = NormalizeS(s);
+
+        // Concatenate r and s to form the 64-byte signature
+        var signature = new byte[64];
+        Buffer.BlockCopy(r, 0, signature, 0, 32);
+        Buffer.BlockCopy(s, 0, signature, 32, 32);
+
+
+
+
+        return signature;
+    }
+
+    private static byte[] Ensure32Bytes(byte[] input)
+    {
+        if (input.Length == 32)
+        {
+            return input;
+        }
+        else if (input.Length == 33 && input[0]==0)
+        {
+            var res = new byte[32];
+            Buffer.BlockCopy(input, 1, res, 0, 32);
+            return res;
+        }
+        else
+        {
+            throw new ArgumentException("Invalid length for r or s value.");
+        }
+    }
+
+
+
     [HttpPost]
     [Route("/makeAssertion")]
     public async Task<JsonResult> MakeAssertion([FromBody] AuthenticatorAssertionRawResponse clientResponse, CancellationToken cancellationToken)
     {
         try
         {
-            //// 1. Get the assertion options we sent the client
-            //var jsonOptions = HttpContext.Session.GetString("fido2.assertionOptions");
-            //var options = AssertionOptions.FromJson(jsonOptions);
-
-            //// 2. Get registered credential from database
-            //var creds = DemoStorage.GetCredentialById(clientResponse.Id) ?? throw new Exception("Unknown credentials");
-
-            /*
-             * Repeating code from Deploy Contract for clarity. Code is expanded for clarity and could be written more concisely.
-             * 
-             * Here we ask Stellar for the Smart Account given the credential id, which is supplied by the user's Authenticator device.
-             */
+           
 
 
             byte[] credentialId= clientResponse.Id;
@@ -405,6 +447,8 @@ public class MyController : Controller
             string ownerAccountPrivateKey = Environment.GetEnvironmentVariable("SOROBAN_ACCOUNT");
             string factoryContractId = Environment.GetEnvironmentVariable("factoryContractId"); //TODO remove factoryContractId it's a dup
             string horizonUrl = Environment.GetEnvironmentVariable("HORIZON_URL");
+            string signinContractId = Environment.GetEnvironmentVariable("SIGNIN_CONTRACT");
+
 
             //Network Id in XDR is represented as a hash.
             byte[] networkId = Util.Hash(Encoding.UTF8.GetBytes(sorobanNetworkPassphrase));
@@ -412,13 +456,15 @@ public class MyController : Controller
 
             #region Get the ID of the passkey's smart account, irrespective of whether it exists or not
             //A contract id preimage (prior to hashing) based on the smart contract address
+            var xdrSCAddress = new StellarDotnetSdk.Xdr.SCAddress()
+            {
+                ContractId = new Hash(StrKey.DecodeContractId(factoryContractId)),
+                Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
+            };
+
             var contractIDPreimageFromAddress = new ContractIDPreimageFromAddress()
             {
-                Address = new StellarDotnetSdk.Xdr.SCAddress()
-                {
-                    ContractId = new Hash(StrKey.DecodeContractId(factoryContractId)),
-                    Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
-                },
+                Address = xdrSCAddress,
                 Salt = new Uint256(credentialIdContractSalt)
             };
 
@@ -446,7 +492,12 @@ public class MyController : Controller
             var hashId = Util.Hash(xdrDataOutputStream.ToArray());
 
             //// The hash now needs to be used as a specific type of "String Key" (StrKey). The following function encodes the hashed data correctly, involving contract id type discriminators and checksums, in a human readable format.
-            var contractId = StrKey.EncodeContractId(hashId);
+            var smartAccountId = StrKey.EncodeContractId(hashId);
+            var smartAccountXdrSCAddress = new StellarDotnetSdk.Xdr.SCAddress()
+            {
+                ContractId = new Hash(StrKey.DecodeContractId(smartAccountId)),
+                Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
+            };
 
             #endregion
 
@@ -458,7 +509,7 @@ public class MyController : Controller
             SorobanServer server = new SorobanServer(sorobanRpcServer);
 
             List<StellarDotnetSdk.LedgerKeys.LedgerKey> ledgerKeys = new List<StellarDotnetSdk.LedgerKeys.LedgerKey>();
-            SCContractId scContractId = new SCContractId(contractId);   // Make the contract id string a concrete type
+            SCContractId scContractId = new SCContractId(smartAccountId);   // Make the contract id string a concrete type
             var key = new SCLedgerKeyContractInstance();                // Specifies to search for a contract instance
             var durability = new ContractDataDurability() { InnerValue = ContractDataDurability.ContractDataDurabilityEnum.PERSISTENT };
             StellarDotnetSdk.LedgerKeys.LedgerKey ledgerKey = StellarDotnetSdk.LedgerKeys.LedgerKey.ContractData(scContractId, key, durability);
@@ -474,31 +525,118 @@ public class MyController : Controller
 
 
             //make a transaction to the custom Sign In Log smart contract on Stellar, using the user's Smart Account as authoriser
+            #region Make and exec the actual sign in transaction
 
-            //if all went well, continue in the knowledge that the user is authenticated and the
+            KeyPair ownerAccount = KeyPair.FromSecretSeed(ownerAccountPrivateKey);
+            var acctInfo = await server.GetAccount(ownerAccount.Address);
+            Account ownerAccountData = new Account(acctInfo.AccountId, acctInfo.SequenceNumber);
+
+            var simTxnBuilder = new TransactionBuilder(ownerAccountData);
+            simTxnBuilder.SetFee(0);
+
+            simTxnBuilder.AddOperation(
+                new InvokeContractOperation(
+                    new SCContractId(signinContractId),
+                    new StellarDotnetSdk.Soroban.SCSymbol("log_sign_in"),
+                    [
+                        StellarDotnetSdk.Soroban.SCAddress.FromXdr(smartAccountXdrSCAddress)            //the address of the smart account signing in
+                    ]
+                )
+            );
+
+            var simTxn = simTxnBuilder.Build();
+            var sim = await server.SimulateTransaction(simTxn);
+            if (sim.Error != null)
+            {
+                return Json(new { status = "error", errorMessage = sim.Error });
+            }
+            //update txn based on simulation
+            simTxn.SetSorobanTransactionData(sim.SorobanTransactionData);
+            simTxn.SetSorobanAuthorization(sim.SorobanAuthorization);
+            simTxn.AddResourceFee(sim.MinResourceFee.Value);
+
+
+            //now update authorisations to include extra elements for the smart account authoriser
+            byte[] decodedSig = ConvertAsn1To64ByteSignature(clientResponse.Response.Signature);
+
+            //add all the webauthn stuff to the authorisation context for this call (these will be 'passed' by the invoked contract to the smart account check_auth)
+            var creds = (simTxn.Operations[0] as InvokeContractOperation).Auth[0].Credentials;
+            var xdrCreds=creds.ToXdr();
+            xdrCreds.Address.SignatureExpirationLedger = new Uint32(xdrCreds.Address.SignatureExpirationLedger.InnerValue + 100); //boost expiration
+            xdrCreds.Address.Signature = new StellarDotnetSdk.Xdr.SCVal()
+            {
+                Discriminant = new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_MAP },
+                Map = new StellarDotnetSdk.Xdr.SCMap([
+                    new StellarDotnetSdk.Xdr.SCMapEntry(){
+                         Key= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_SYMBOL },
+                             Sym=new StellarDotnetSdk.Xdr.SCSymbol("authenticator_data")
+                         },
+                         Val= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_BYTES },
+                             Bytes=new StellarDotnetSdk.Xdr.SCBytes( clientResponse.Response.AuthenticatorData)
+                         }
+                    },
+                    new StellarDotnetSdk.Xdr.SCMapEntry(){
+                         Key= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_SYMBOL },
+                             Sym=new StellarDotnetSdk.Xdr.SCSymbol("client_data_json")
+                         },
+                         Val= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_BYTES },
+                             Bytes=new StellarDotnetSdk.Xdr.SCBytes( clientResponse.Response.ClientDataJson)
+                         }
+                    },
+                    new StellarDotnetSdk.Xdr.SCMapEntry(){
+                         Key= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_SYMBOL },
+                             Sym=new StellarDotnetSdk.Xdr.SCSymbol("signature")
+                         },
+                         Val= new StellarDotnetSdk.Xdr.SCVal(){
+                             Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_BYTES },
+                             Bytes=new StellarDotnetSdk.Xdr.SCBytes(decodedSig)
+                         }
+                    }
+
+                ])
+            };
+            var domainCreds = StellarDotnetSdk.Operations.SorobanCredentials.FromXdr(xdrCreds);
+            var modifiedAuthorisationEntry = new StellarDotnetSdk.Operations.SorobanAuthorizationEntry(domainCreds, (simTxn.Operations[0] as InvokeContractOperation).Auth[0].RootInvocation);
+            (simTxn.Operations[0] as InvokeContractOperation).Auth[0] = modifiedAuthorisationEntry;
+
+            //re-simulate
+            sim = await server.SimulateTransaction(simTxn);
+            if (sim.Error != null)
+            {
+                return Json(new { status = "error", errorMessage = sim.Error });
+            }
+            //update txn based on simulation
+            simTxn.SetSorobanTransactionData(sim.SorobanTransactionData);
+            simTxn.SetSorobanAuthorization(sim.SorobanAuthorization);
+            simTxn.AddResourceFee(sim.MinResourceFee.Value);
 
 
 
-            //// 3. Get credential counter from database
-            //var storedCounter = creds.SignCount;
+            simTxn.Sign(ownerAccount);
 
-            //// 4. Create callback to check if the user handle owns the credentialId
-            //IsUserHandleOwnerOfCredentialIdAsync callback = static async (args, cancellationToken) =>
-            //{
-            //    var storedCreds = await DemoStorage.GetCredentialsByUserHandleAsync(args.UserHandle, cancellationToken);
-            //    return storedCreds.Exists(c => c.Descriptor.Id.SequenceEqual(args.CredentialId));
-            //};
+            Server horizon = new Server(horizonUrl);
 
-            //// 5. Make the assertion
-            //var res = await _fido2.MakeAssertionAsync(clientResponse, options, creds.PublicKey, creds.DevicePublicKeys, storedCounter, callback, cancellationToken: cancellationToken);
+            var horizonResponse = await horizon.SubmitTransaction(simTxn);
 
-            //// 6. Store the updated counter
-            //DemoStorage.UpdateCounter(res.CredentialId, res.SignCount);
 
-            //if (res.DevicePublicKey is not null)
-            //    creds.DevicePublicKeys.Add(res.DevicePublicKey);
 
-            // 7. return OK to client
+
+
+
+
+
+
+            #endregion
+
+            // All went well, continue in the knowledge that the user is authenticated/authorized
+            // and the sign in publically logged.
+            // Implement custom logic here.
+
             return Json("ok");
         }
         catch (Exception e)
