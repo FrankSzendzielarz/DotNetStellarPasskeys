@@ -1,0 +1,101 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+ 
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Fido2Demo</RootNamespace>
+    <UserSecretsId>39589262-6aa1-4bde-aaa9-403a7542cf63</UserSecretsId>
+    <Configurations>Debug;Release;BuildContracts;FundTestAccount;DeployContracts;FmtContracts;CleanContracts;InitWebauthnFactory;</Configurations>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fido2.AspNet" Version="4.0.0-beta.13" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.0" />
+    <PackageReference Include="PeterO.Cbor" Version="4.5.3" />
+    <PackageReference Include="stellar-dotnet-sdk" Version="11.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Contracts\contract-signin-record\src\" />
+    <Folder Include="Contracts\contract-signin-record\target\" />
+    <Folder Include="Contracts\out\" />
+    <Folder Include="wwwroot\bulma\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Contracts\contract-webauthn-factory\target\.rustc_info.json" />
+    <None Include="Contracts\contract-webauthn-secp256r1\target\.rustc_info.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fido2.Development\Fido2.Development.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="Pages\custom.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+    <Content Update="Pages\usernameless.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+    <Content Update="Pages\passwordless.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+    <Content Update="Pages\mfa.cshtml">
+      <Pack>$(IncludeRazorContentInPack)</Pack>
+    </Content>
+  </ItemGroup>
+
+
+
+
+
+
+  <Target Name="FundTestAccount" Condition="'$(Configuration)' == 'FundTestAccount'" BeforeTargets="Build">
+
+    <Exec Command="soroban keys fund --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; $(SOROBAN_ACCOUNT_PUB)" />
+    <Exec Command="soroban contract asset deploy --asset native --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot;" />
+  </Target>
+
+  <Target Name="DeployContracts" Condition="'$(Configuration)' == 'DeployContracts'" BeforeTargets="Build">
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract deploy --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_factory.optimized.wasm" />
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract install --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./webauthn_account_secp256r1.optimized.wasm" />
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract deploy --rpc-url &quot;$(SOROBAN_RPC_URL)&quot; --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --source-account &quot;$(SOROBAN_ACCOUNT)&quot; --wasm ./signin_record.optimized.wasm" />
+  </Target>
+
+  <Target Name="FmtContracts" Condition="'$(Configuration)' == 'FmtContracts'" BeforeTargets="Build">
+    <Exec Command="cd Contracts/contract-webauthn-factory &amp;&amp; cargo fmt --all" />
+    <Exec Command="cd Contracts/contract-webauthn-secp256r1 &amp;&amp; cargo fmt --all" />
+    <Exec Command="cd Contracts/contract-signin-record &amp;&amp; cargo fmt --all" />
+  </Target>
+
+  <Target Name="CleanContracts" Condition="'$(Configuration)' == 'CleanContracts'" BeforeTargets="Build">
+    <Exec Command="cd Contracts/contract-webauthn-factory &amp;&amp; cargo clean" />
+    <Exec Command="cd Contracts/contract-webauthn-secp256r1 &amp;&amp; cargo clean" />
+    <Exec Command="cd Contracts/contract-signin-record &amp;&amp; cargo clean" />
+  </Target>
+
+  <Target Name="InitWebauthnFactory" Condition="'$(Configuration)' == 'InitWebauthnFactory'" BeforeTargets="Build">
+    <Exec Command="soroban contract invoke --network-passphrase &quot;$(SOROBAN_NETWORK_PASSPHRASE)&quot; --id $(WEBAUTHN_FACTORY)  -- init --wasm_hash $(WEBAUTHN_WASM)" />
+  </Target>
+
+
+  <Target Name="BuildContracts" Condition="'$(Configuration)' == 'BuildContracts'" BeforeTargets="Build">
+    <Message Text="BuildContracts configuration is active." Importance="high" />
+    <Message Text="Compiling Soroban contracts to WASM" Importance="high" />
+
+    <Exec Command="cd Contracts/contract-webauthn-factory &amp;&amp; soroban contract build --out-dir ../out" />
+    <Exec Command="cd Contracts/contract-webauthn-secp256r1 &amp;&amp; soroban contract build --out-dir ../out" />
+    <Exec Command="cd Contracts/contract-signin-record &amp;&amp; soroban contract build --out-dir ../out" />
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract optimize --wasm ./webauthn_factory.wasm" />
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract optimize --wasm ./webauthn_account_secp256r1.wasm" />
+    <Exec Command="cd Contracts/out &amp;&amp; soroban contract optimize --wasm ./signin_record.wasm" />
+  </Target>
+
+
+
+
+
+
+
+</Project>

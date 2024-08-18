@@ -1,0 +1,46 @@
+{
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:4728/",
+      "sslPort": 44329
+    }
+  },
+  "profiles": {
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+
+        "SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org",
+        "SOROBAN_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
+        "SOROBAN_NETWORK": "testnet",
+        "SOROBAN_ACCOUNT": "SCVGBJMY6KROPTTG3NIHFQAC525HQKAGJLQNP3BY7GADPFE4PBWIR46C",
+        "SOROBAN_ACCOUNT_PUB": "GCMC2MCYICUKSVTQI4GVRX5UTXQPLKSC3M352K2ZBBDP2MCLMJCV4WIV",
+        "WEBAUTHN_FACTORY": "CBZJ23BGTZUJ2LBQY2SBCNUAA37IFX7ZBZX5KKXEFSJ5BKT74HG47WTT",
+        "WEBAUTHN_WASM": "c42c2dbb7b8f475109f4c9566edc18f9c76992cffec5036e207d4bf97a12c4f9",
+        "factoryContractId": "CBZJ23BGTZUJ2LBQY2SBCNUAA37IFX7ZBZX5KKXEFSJ5BKT74HG47WTT",
+        "accountSecp256r1ContractWasm": "c42c2dbb7b8f475109f4c9566edc18f9c76992cffec5036e207d4bf97a12c4f9"
+      }
+    },
+    "Fido2Demo": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+
+        "SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org",
+        "SOROBAN_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
+        "SOROBAN_NETWORK": "testnet",
+        "SOROBAN_ACCOUNT": "SCVGBJMY6KROPTTG3NIHFQAC525HQKAGJLQNP3BY7GADPFE4PBWIR46C",
+        "SOROBAN_ACCOUNT_PUB": "GCMC2MCYICUKSVTQI4GVRX5UTXQPLKSC3M352K2ZBBDP2MCLMJCV4WIV",
+        "WEBAUTHN_FACTORY": "CBZJ23BGTZUJ2LBQY2SBCNUAA37IFX7ZBZX5KKXEFSJ5BKT74HG47WTT",
+        "WEBAUTHN_WASM": "c42c2dbb7b8f475109f4c9566edc18f9c76992cffec5036e207d4bf97a12c4f9",
+        "factoryContractId": "CBZJ23BGTZUJ2LBQY2SBCNUAA37IFX7ZBZX5KKXEFSJ5BKT74HG47WTT",
+        "accountSecp256r1ContractWasm": "c42c2dbb7b8f475109f4c9566edc18f9c76992cffec5036e207d4bf97a12c4f9"
+      },
+      "applicationUrl": "http://localhost:4729/;https://localhost:44329/"
+    }
+  }
+}

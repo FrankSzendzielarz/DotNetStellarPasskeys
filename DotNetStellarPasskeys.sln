@@ -1,0 +1,61 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.34916.146
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StellarPasskeyDemo", "StellarPasskeyDemo\StellarPasskeyDemo.csproj", "{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Fido2.Development", "Fido2.Development\Fido2.Development.csproj", "{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		BuildContracts|Any CPU = BuildContracts|Any CPU
+		CleanContracts|Any CPU = CleanContracts|Any CPU
+		Debug|Any CPU = Debug|Any CPU
+		DeployContracts|Any CPU = DeployContracts|Any CPU
+		FmtContracts|Any CPU = FmtContracts|Any CPU
+		FundTestAccount|Any CPU = FundTestAccount|Any CPU
+		InitWebauthnFactory|Any CPU = InitWebauthnFactory|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.BuildContracts|Any CPU.ActiveCfg = BuildContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.BuildContracts|Any CPU.Build.0 = BuildContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.CleanContracts|Any CPU.ActiveCfg = CleanContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.CleanContracts|Any CPU.Build.0 = CleanContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.DeployContracts|Any CPU.ActiveCfg = DeployContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.DeployContracts|Any CPU.Build.0 = DeployContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.FmtContracts|Any CPU.ActiveCfg = FmtContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.FmtContracts|Any CPU.Build.0 = FmtContracts|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.FundTestAccount|Any CPU.ActiveCfg = FundTestAccount|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.FundTestAccount|Any CPU.Build.0 = FundTestAccount|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.InitWebauthnFactory|Any CPU.ActiveCfg = InitWebauthnFactory|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.InitWebauthnFactory|Any CPU.Build.0 = InitWebauthnFactory|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B1D2EBE-FC2E-4DC2-A0C3-3DEE1E641B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.BuildContracts|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.BuildContracts|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.CleanContracts|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.CleanContracts|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.DeployContracts|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.DeployContracts|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.FmtContracts|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.FmtContracts|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.FundTestAccount|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.FundTestAccount|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.InitWebauthnFactory|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.InitWebauthnFactory|Any CPU.Build.0 = Debug|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6E8E2B2-65B4-4C6D-BB29-49827967CAEF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C4B98562-68DF-414A-94D5-82FD0127FC48}
+	EndGlobalSection
+EndGlobal
