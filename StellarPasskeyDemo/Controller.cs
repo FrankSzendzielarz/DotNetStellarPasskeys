@@ -6,12 +6,15 @@ using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Common.Logging.Configuration;
 using Fido2NetLib;
 using Fido2NetLib.Cbor;
 using Fido2NetLib.Development;
 using Fido2NetLib.Objects;
+using Fido2NetLib.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PeterO.Cbor;
@@ -350,7 +353,8 @@ public class MyController : Controller
                 uv,
                 exts
             );
-
+           
+            
             // 4. Temporarily store options, session/in-memory cache/redis/db
             HttpContext.Session.SetString("fido2.assertionOptions", options.ToJson());
 
@@ -429,18 +433,22 @@ public class MyController : Controller
     }
 
 
-
+    /// <summary>
+    /// The current Soroban passkey Smart Account implementation requires a network-supplied transaction proposal as its signed challenge. 
+    /// Unfortunately the transaction needs to be proposed by the network and that needs to be the challenge signed by the smart account,
+    /// but the smart account depends on the passkey belonging to the user, and we can't know that until the user has signed some challenge.
+    /// For this reason we need a 2-step process. 
+    /// Normally this would be fine. Eg: Sign-in, followed by a vote, or a game trade, or a doctor's assessment, but in this case we need to
+    /// do something as part of the sign in step.
+    /// </summary>
     [HttpPost]
-    [Route("/makeAssertion")]
-    public async Task<JsonResult> MakeAssertion([FromBody] AuthenticatorAssertionRawResponse clientResponse, CancellationToken cancellationToken)
+    [Route("/makeInterimAssertion")]
+    public async Task<JsonResult> MakeInterimAssertion([FromBody] AuthenticatorAssertionRawResponse clientResponse, CancellationToken cancellationToken)
     {
         try
         {
-           
-
-
-            byte[] credentialId= clientResponse.Id;
-
+            // Expanded and repeated for educational purposes. Normally this would be a function call.
+            byte[] credentialId = clientResponse.Id;
             string sorobanNetwork = Environment.GetEnvironmentVariable("SOROBAN_NETWORK");
             string sorobanNetworkPassphrase = Environment.GetEnvironmentVariable("SOROBAN_NETWORK_PASSPHRASE");
             string sorobanRpcServer = Environment.GetEnvironmentVariable("SOROBAN_RPC_URL");
@@ -448,6 +456,11 @@ public class MyController : Controller
             string factoryContractId = Environment.GetEnvironmentVariable("factoryContractId"); //TODO remove factoryContractId it's a dup
             string horizonUrl = Environment.GetEnvironmentVariable("HORIZON_URL");
             string signinContractId = Environment.GetEnvironmentVariable("SIGNIN_CONTRACT");
+
+
+            /*
+             * At this point the interim passkey assertion could also be verified. Please refer to the Fido2Demo project for an example of this.
+             */
 
 
             //Network Id in XDR is represented as a hash.
@@ -555,10 +568,178 @@ public class MyController : Controller
             simTxn.SetSorobanAuthorization(sim.SorobanAuthorization);
             simTxn.AddResourceFee(sim.MinResourceFee.Value);
 
+     
+
+
+            #endregion
+
+            #region Generate signing material for the transaction to authorise:
+
+            uint lastLedger = (uint)(await server.GetLatestLedger()).Sequence;
+            var transactionToAuthorize = new HashIDPreimageSorobanAuthorization()
+            {
+                NetworkID = new Hash(networkId),
+                Nonce = new StellarDotnetSdk.Xdr.Int64((sim.SorobanAuthorization[0].Credentials as StellarDotnetSdk.Operations.SorobanAddressCredentials).Nonce),
+                Invocation = sim.SorobanAuthorization[0].RootInvocation.ToXdr(),
+                SignatureExpirationLedger = new StellarDotnetSdk.Xdr.Uint32( lastLedger + (uint)100)
+            };
+
+
+
+            HashIDPreimage transactionToAuthorizeHashIDPreimage = new HashIDPreimage()
+            {
+                Discriminant = new EnvelopeType() { InnerValue = EnvelopeType.EnvelopeTypeEnum.ENVELOPE_TYPE_SOROBAN_AUTHORIZATION },
+                SorobanAuthorization = transactionToAuthorize
+            };
+
+            // Now the XDR representation is expected hashed and this gives the contract id
+            xdrDataOutputStream = new XdrDataOutputStream();
+            HashIDPreimage.Encode(xdrDataOutputStream, transactionToAuthorizeHashIDPreimage);
+            var proposedChallenge = Util.Hash(xdrDataOutputStream.ToArray());
+
+
+            // Return interim assertion options for the transaction-based challenge
+            var options = _fido2.GetAssertionOptions(
+                new List<PublicKeyCredentialDescriptor>(),
+                UserVerificationRequirement.Discouraged,
+                new AuthenticationExtensionsClientInputs()
+                {
+                    Extensions = true,
+                    UserVerificationMethod = true,
+                    DevicePubKey = new AuthenticationExtensionsDevicePublicKeyInputs()
+                }
+            );
+            options.Challenge = proposedChallenge;
+            #endregion
+
+
+            var simTxnXdr = simTxn.ToUnsignedEnvelopeXdrBase64();
+       
+            
+            
+            
+            
+
+            return Json(new { Options= options, TransactionData=simTxnXdr });
+        }
+        catch (Exception e)
+        {
+            return Json(new { Status = "error", ErrorMessage = FormatException(e) });
+        }
+    }
+
+
+    [HttpPost]
+    [Route("/makeAssertion")]
+    public async Task<JsonResult> MakeAssertion([FromBody] StellarAuthenticatorInterimResponse clientResponse, CancellationToken cancellationToken)
+    {
+        try
+        {
+           
+
+            byte[] credentialId= clientResponse.TransactionAssertion.Id;
+
+            string sorobanNetwork = Environment.GetEnvironmentVariable("SOROBAN_NETWORK");
+            string sorobanNetworkPassphrase = Environment.GetEnvironmentVariable("SOROBAN_NETWORK_PASSPHRASE");
+            string sorobanRpcServer = Environment.GetEnvironmentVariable("SOROBAN_RPC_URL");
+            string ownerAccountPrivateKey = Environment.GetEnvironmentVariable("SOROBAN_ACCOUNT");
+            string factoryContractId = Environment.GetEnvironmentVariable("factoryContractId"); //TODO remove factoryContractId it's a dup
+            string horizonUrl = Environment.GetEnvironmentVariable("HORIZON_URL");
+            string signinContractId = Environment.GetEnvironmentVariable("SIGNIN_CONTRACT");
+
+
+            //Network Id in XDR is represented as a hash.
+            byte[] networkId = Util.Hash(Encoding.UTF8.GetBytes(sorobanNetworkPassphrase));
+            byte[] credentialIdContractSalt = Util.Hash(credentialId);
+
+            #region Get the ID of the passkey's smart account, irrespective of whether it exists or not
+            //A contract id preimage (prior to hashing) based on the smart contract address
+            var xdrSCAddress = new StellarDotnetSdk.Xdr.SCAddress()
+            {
+                ContractId = new Hash(StrKey.DecodeContractId(factoryContractId)),
+                Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
+            };
+
+            var contractIDPreimageFromAddress = new ContractIDPreimageFromAddress()
+            {
+                Address = xdrSCAddress,
+                Salt = new Uint256(credentialIdContractSalt)
+            };
+
+            // Create the HashIdPreimageContractId, which is just a union of the network id hash and the contract id preimage (iotw unhashed),
+            // making a unique contract id. The naming is a bit opaque at first, more intuitive being something like 'network contract id'
+            HashIDPreimageContractID contractIdPreimage = new HashIDPreimageContractID()
+            {
+                NetworkID = new Hash(networkId), //The XDR Hash object merely represents a hash, this ctor setting its inner value to the actual hash
+                ContractIDPreimage = new StellarDotnetSdk.Xdr.ContractIDPreimage()
+                {
+                    FromAddress = contractIDPreimageFromAddress,
+                    Discriminant = new ContractIDPreimageType() { InnerValue = ContractIDPreimageType.ContractIDPreimageTypeEnum.CONTRACT_ID_PREIMAGE_FROM_ADDRESS }
+                }
+            };
+
+            // Make a general "Hash Id Preimage" object
+            var hashIdPreImage = new HashIDPreimage();
+            hashIdPreImage.Discriminant = new EnvelopeType() { InnerValue = EnvelopeType.EnvelopeTypeEnum.ENVELOPE_TYPE_CONTRACT_ID };
+            hashIdPreImage.ContractID = contractIdPreimage;
+
+
+            // Now the XDR representation is expected hashed and this gives the contract id
+            XdrDataOutputStream xdrDataOutputStream = new XdrDataOutputStream();
+            HashIDPreimage.Encode(xdrDataOutputStream, hashIdPreImage);
+            var hashId = Util.Hash(xdrDataOutputStream.ToArray());
+
+            //// The hash now needs to be used as a specific type of "String Key" (StrKey). The following function encodes the hashed data correctly, involving contract id type discriminators and checksums, in a human readable format.
+            var smartAccountId = StrKey.EncodeContractId(hashId);
+            var smartAccountXdrSCAddress = new StellarDotnetSdk.Xdr.SCAddress()
+            {
+                ContractId = new Hash(StrKey.DecodeContractId(smartAccountId)),
+                Discriminant = new SCAddressType() { InnerValue = SCAddressType.SCAddressTypeEnum.SC_ADDRESS_TYPE_CONTRACT }
+            };
+
+            #endregion
+
+
+            #region Ask the RPC Server for data on that Smart Account and check it exists 
+            Network network = new Network(sorobanNetworkPassphrase);
+            Network.Use(network);
+
+            SorobanServer server = new SorobanServer(sorobanRpcServer);
+
+            List<StellarDotnetSdk.LedgerKeys.LedgerKey> ledgerKeys = new List<StellarDotnetSdk.LedgerKeys.LedgerKey>();
+            SCContractId scContractId = new SCContractId(smartAccountId);   // Make the contract id string a concrete type
+            var key = new SCLedgerKeyContractInstance();                // Specifies to search for a contract instance
+            var durability = new ContractDataDurability() { InnerValue = ContractDataDurability.ContractDataDurabilityEnum.PERSISTENT };
+            StellarDotnetSdk.LedgerKeys.LedgerKey ledgerKey = StellarDotnetSdk.LedgerKeys.LedgerKey.ContractData(scContractId, key, durability);
+            ledgerKeys.Add(ledgerKey);   //add the search key to a collection  
+
+            var res = await server.GetLedgerEntries(ledgerKeys.ToArray());
+            if (res.LedgerEntries.Length == 0)
+            {
+                return Json(new { status = "error", errorMessage = "Smart Account does not exist." });
+            }
+
+            #endregion
+
+
+
+            #region Make the actual sign in transaction again, from the xdr base64:
+
+
+            var simTxn = StellarDotnetSdk.Transactions.Transaction.FromEnvelopeXdr(clientResponse.TransactionData);
+
+
+            #endregion
+
+
+            //make a transaction to the custom Sign In Log smart contract on Stellar, using the user's Smart Account as authoriser
+            #region Update the sign-in transaction with the signed passkey assertion data from the client authenticator
+
+
 
             //now update authorisations to include extra elements for the smart account authoriser
-            byte[] decodedSig = ConvertAsn1To64ByteSignature(clientResponse.Response.Signature);
 
+            byte[] decodedSig = ConvertAsn1To64ByteSignature(clientResponse.TransactionAssertion.Response.Signature);
             //add all the webauthn stuff to the authorisation context for this call (these will be 'passed' by the invoked contract to the smart account check_auth)
             var creds = (simTxn.Operations[0] as InvokeContractOperation).Auth[0].Credentials;
             var xdrCreds=creds.ToXdr();
@@ -574,7 +755,7 @@ public class MyController : Controller
                          },
                          Val= new StellarDotnetSdk.Xdr.SCVal(){
                              Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_BYTES },
-                             Bytes=new StellarDotnetSdk.Xdr.SCBytes( clientResponse.Response.AuthenticatorData)
+                             Bytes=new StellarDotnetSdk.Xdr.SCBytes(clientResponse.TransactionAssertion.Response.AuthenticatorData)
                          }
                     },
                     new StellarDotnetSdk.Xdr.SCMapEntry(){
@@ -584,7 +765,7 @@ public class MyController : Controller
                          },
                          Val= new StellarDotnetSdk.Xdr.SCVal(){
                              Discriminant= new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_BYTES },
-                             Bytes=new StellarDotnetSdk.Xdr.SCBytes( clientResponse.Response.ClientDataJson)
+                             Bytes=new StellarDotnetSdk.Xdr.SCBytes( clientResponse.TransactionAssertion.Response.ClientDataJson)
                          }
                     },
                     new StellarDotnetSdk.Xdr.SCMapEntry(){
@@ -600,12 +781,13 @@ public class MyController : Controller
 
                 ])
             };
+            
             var domainCreds = StellarDotnetSdk.Operations.SorobanCredentials.FromXdr(xdrCreds);
             var modifiedAuthorisationEntry = new StellarDotnetSdk.Operations.SorobanAuthorizationEntry(domainCreds, (simTxn.Operations[0] as InvokeContractOperation).Auth[0].RootInvocation);
             (simTxn.Operations[0] as InvokeContractOperation).Auth[0] = modifiedAuthorisationEntry;
 
             //re-simulate
-            sim = await server.SimulateTransaction(simTxn);
+            var sim = await server.SimulateTransaction(simTxn);
             if (sim.Error != null)
             {
                 return Json(new { status = "error", errorMessage = sim.Error });
@@ -616,27 +798,21 @@ public class MyController : Controller
             simTxn.AddResourceFee(sim.MinResourceFee.Value);
 
 
-
+            KeyPair ownerAccount = KeyPair.FromSecretSeed(ownerAccountPrivateKey);
             simTxn.Sign(ownerAccount);
 
             Server horizon = new Server(horizonUrl);
 
             var horizonResponse = await horizon.SubmitTransaction(simTxn);
 
-
-
-
-
-
-
-
-
             #endregion
 
+
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             // All went well, continue in the knowledge that the user is authenticated/authorized
             // and the sign in publically logged.
             // Implement custom logic here.
-
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             return Json("ok");
         }
         catch (Exception e)

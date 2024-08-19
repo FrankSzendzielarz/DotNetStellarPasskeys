@@ -49,6 +49,7 @@ public class Startup
         {
             options.ServerDomain = Configuration["fido2:serverDomain"];
             options.ServerName = "FIDO2 Test";
+            options.ChallengeSize = 32; //IMPORTANT
             options.Origins = Configuration.GetSection("fido2:origins").Get<HashSet<string>>();
             options.TimestampDriftTolerance = Configuration.GetValue<int>("fido2:timestampDriftTolerance");
             options.MDSCacheDirPath = Configuration["fido2:MDSCacheDirPath"];
