@@ -91,7 +91,7 @@ async function handleSignInSubmit(event) {
             showErrorAlert(err.message ? err.message : err);
         }
 
-        var stellarResponse = await verifyAssertionWithServer(stellarcredential, stellarInterimResponse.transactionData);
+        var stellarResponse = await verifyAssertionWithServer(stellarcredential, stellarInterimResponse.transactionData, stellarInterimResponse.lastLedger);
 
 
 
@@ -165,7 +165,7 @@ async function verifyInterimAssertionWithServer(assertedCredential) {
 * Sends the credential to the the FIDO2 server for assertion
 * @param {any} assertedCredential
 */
-async function verifyAssertionWithServer(assertedCredential, transactionDataXDRb64) {
+async function verifyAssertionWithServer(assertedCredential, transactionDataXDRb64, lastLedger) {
 
     // Move data into Arrays incase it is super long
     let authData = new Uint8Array(assertedCredential.response.authenticatorData);
@@ -188,6 +188,7 @@ async function verifyAssertionWithServer(assertedCredential, transactionDataXDRb
             }
         },
         transactionData: transactionDataXDRb64,
+        lastLedger: lastLedger
 
 
     };

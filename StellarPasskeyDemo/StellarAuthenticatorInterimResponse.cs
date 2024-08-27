@@ -10,7 +10,7 @@ namespace Fido2Demo
         public AuthenticatorAssertionRawResponse TransactionAssertion { get; set; }
         public string TransactionData { get; set; }
 
-
+        public uint LastLedger { get; set; }
 
     }
 

@@ -585,6 +585,7 @@ public class MyController : Controller
             };
 
 
+            
 
             HashIDPreimage transactionToAuthorizeHashIDPreimage = new HashIDPreimage()
             {
@@ -620,7 +621,7 @@ public class MyController : Controller
             
             
 
-            return Json(new { Options= options, TransactionData=simTxnXdr });
+            return Json(new { Options= options, TransactionData=simTxnXdr, LastLedger= lastLedger + (uint)100 });
         }
         catch (Exception e)
         {
@@ -743,7 +744,7 @@ public class MyController : Controller
             //add all the webauthn stuff to the authorisation context for this call (these will be 'passed' by the invoked contract to the smart account check_auth)
             var creds = (simTxn.Operations[0] as InvokeContractOperation).Auth[0].Credentials;
             var xdrCreds=creds.ToXdr();
-            xdrCreds.Address.SignatureExpirationLedger = new Uint32(xdrCreds.Address.SignatureExpirationLedger.InnerValue + 100); //boost expiration
+            xdrCreds.Address.SignatureExpirationLedger = new Uint32(clientResponse.LastLedger); //boost expiration
             xdrCreds.Address.Signature = new StellarDotnetSdk.Xdr.SCVal()
             {
                 Discriminant = new SCValType() { InnerValue = SCValType.SCValTypeEnum.SCV_MAP },
